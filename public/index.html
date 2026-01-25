@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fuel Watchdog | Australia</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" />
+    <style>
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: 'Roboto', sans-serif;
+            overflow: hidden;
+        }
+
+        .navbar {
+            height: 60px;
+            background: #1976d2;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            z-index: 2000;
+            position: relative;
+        }
+
+        #search-input {
+            width: 100%;
+            padding: 8px 12px;
+            border-radius: 20px;
+            border: none;
+            outline: none;
+            font-size: 14px;
+        }
+
+        #sidebar {
+            position: fixed;
+            top: 0;
+            left: -300px;
+            width: 280px;
+            height: 100%;
+            background: white;
+            z-index: 3000;
+            transition: 0.3s;
+            box-shadow: 5px 0 15px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            visibility: hidden;
+        }
+
+        #sidebar.open {
+            left: 0;
+            visibility: visible;
+        }
+
+        #sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.4);
+            z-index: 2900;
+            display: none;
+        }
+
+        #brand-list {
+            flex-grow: 1;
+            overflow-y: auto;
+            margin: 15px 0;
+            border-top: 1px solid #eee;
+            border-bottom: 1px solid #eee;
+        }
+
+        .brand-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 0;
+            font-size: 13px;
+            cursor: pointer;
+            border-bottom: 1px solid #f9f9f9;
+        }
+
+        .brand-icon-small {
+            width: 20px;
+            height: 20px;
+            object-fit: contain;
+        }
+
+        #map-container {
+            position: relative;
+            height: calc(100vh - 60px);
+            width: 100%;
+        }
+
+        #map {
+            height: 100%;
+            width: 100%;
+            z-index: 1;
+        }
+
+        #ui-overlay {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            z-index: 1000;
+            background: white;
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            width: 210px;
+        }
+
+        #map-message {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1500;
+            background: #ff9800;
+            color: white;
+            padding: 8px 20px;
+            border-radius: 20px;
+            display: none;
+        }
+
+        .custom-marker {
+            background: transparent !important;
+            border: none !important;
+        }
+
+        .marker-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* 强化气泡的对比度 */
+        .price-bubble {
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-weight: 800;
+            /* 加粗字体 */
+            font-size: 11px;
+            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.16);
+            /* 稍微深一点的阴影 */
+            border: 1.5px solid #ccc;
+            background: white;
+            white-space: nowrap;
+            transition: transform 0.2s;
+        }
+
+        /* 鼠标悬停时稍微放大气泡 */
+        .marker-container:hover .price-bubble {
+            transform: scale(1.1);
+            z-index: 1000;
+        }
+
+        .brand-logo {
+            width: 24px;
+            height: 24px;
+            object-fit: contain;
+            background: white;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            padding: 1px;
+        }
+
+        .search-error-popup {
+            position: absolute;
+            top: 45px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 5px 12px;
+            border-radius: 5px;
+            font-size: 12px;
+            display: none;
+            z-index: 2500;
+        }
+
+        .fade-in-out {
+            display: block !important;
+            animation: fadeInOut 3s forwards;
+        }
+
+        @keyframes fadeInOut {
+
+            0%,
+            100% {
+                opacity: 0;
+            }
+
+            10%,
+            80% {
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div id="sidebar-overlay"></div>
+    <div id="sidebar">
+        <div style="padding-bottom: 15px; border-bottom: 2px solid #1976d2; margin-bottom: 15px;">
+            <h2 style="margin:0; color: #1976d2; font-size: 20px;">Fuel Price Watch Dog</h2>
+        </div>
+        
+        <div style="flex-grow: 1; overflow-y: auto;">
+            <div class="sidebar-section" style="margin-bottom: 25px;">
+                <b style="font-size: 14px; display: block; margin-bottom: 10px;">💰 Price Range ($)</b>
+                <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 10px;">
+                    <input type="number" id="price-min-input" step="0.01" placeholder="Min" style="width: 70px; padding: 5px; border: 1px solid #ddd; border-radius: 4px;">
+                    <span>-</span>
+                    <input type="number" id="price-max-input" step="0.01" placeholder="Max" style="width: 70px; padding: 5px; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button id="apply-price-range" style="flex:1; padding: 6px; background: #2196f3; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">Apply Price</button>
+                    <button id="reset-price-range" style="flex:1; padding: 6px; background: #eee; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; font-size: 12px;">Reset</button>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <b style="font-size: 14px; display: block; margin-bottom: 10px;">⛽ Brand Filter</b>
+                <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+                    <button id="select-all-brands" style="flex:1; padding: 5px; font-size: 11px; cursor: pointer; background: #f0f0f0; border: 1px solid #ccc; border-radius: 4px;">Select All</button>
+                    <button id="unselect-all-brands" style="flex:1; padding: 5px; font-size: 11px; cursor: pointer; background: #f0f0f0; border: 1px solid #ccc; border-radius: 4px;">Unselect All</button>
+                </div>
+                <div id="brand-list" style="max-height: 300px; overflow-y: auto; border: 1px solid #f0f0f0; padding: 5px; border-radius: 4px;">
+                    </div>
+            </div>
+        </div>
+
+        <div style="margin-top: 20px; display: flex; flex-direction: column; gap: 10px;">
+            <button id="apply-filters" style="padding: 12px; background: #4caf50; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">Apply All Filters</button>
+            <button id="close-sidebar" style="padding: 10px; background: #f5f5f5; border: 1px solid #ddd; border-radius: 8px; cursor: pointer;">Close Menu</button>
+        </div>
+        <div style="margin-top: 10px; margin-bottom: 20px; display: flex; flex-direction: column; gap: 10px;">
+    <button id="about-btn" style="padding: 10px; background: transparent; border: 1px solid #1976d2; color: #1976d2; border-radius: 8px; cursor: pointer; font-size: 13px;">ℹ️ About Project</button>
+</div>
+
+<div id="about-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:5000; align-items:center; justify-content:center;">
+    <div style="background:white; width:90%; max-width:500px; padding:25px; border-radius:15px; box-shadow:0 10px 30px rgba(0,0,0,0.3); position:relative; max-height:80vh; overflow-y:auto;">
+        <span id="close-about" style="position:absolute; top:15px; right:20px; font-size:24px; cursor:pointer; color:#999;">&times;</span>
+        
+        <h2 style="color:#1976d2; margin-top:0;">Fuel Price Watch Dog</h2>
+        <p style="font-size:14px; color:#444; line-height:1.6;">
+            This is an <strong>Open Source</strong> project dedicated to providing real-time fuel price transparency across Australia.
+        </p>
+        
+        <div style="background:#f0f7ff; padding:12px; border-left:4px solid #1976d2; margin:15px 0;">
+            <span style="font-size:13px;">GitHub Repository:</span><br>
+            <a href="https://github.com/DynastyKids/NodeJS-FuelWatchdog" target="_blank" style="color:#1976d2; word-break:break-all; font-weight:bold; text-decoration:none;">
+                https://github.com/DynastyKids/NodeJS-FuelWatchdog
+            </a>
+        </div>
+
+        <h3 style="font-size:16px; margin-bottom:10px;">Credits & Licenses</h3>
+<ul style="font-size:13px; color:#666; padding-left:20px; line-height:1.6; margin-bottom: 15px;">
+    <li><strong>Node.js:</strong> Server-side runtime (OpenJS Foundation).</li>
+    <li><strong>Leaflet:</strong> Interactive map engine (BSD-2-Clause).</li>
+    <li><strong>MongoDB:</strong> Database engine (SSPL/Apache).</li>
+    <li><strong>External Services:</strong> Navigation by Google Maps & Waze.</li>
+</ul>
+
+<h3 style="font-size:16px; margin-bottom:10px;">Data Attribution</h3>
+<div style="font-size:12px; color:#777; line-height:1.5; background: #f9f9f9; padding: 10px; border-radius: 8px;">
+    <p style="margin: 0 0 8px 0;">This project uses open data provided by Australian State Governments:</p>
+    <ul style="padding-left:15px; margin: 0;">
+        <li><strong>NSW / ACT / TAS:</strong> FuelCheck data provided by <strong>API.NSW</strong> with supported by Supported by: Department of Customer Service NSW.</li>
+        <li><strong>QLD:</strong> Fuel price data provided by <strong>State of Queensland (Department of Energy and Climate)</strong>.</li>
+        <li><strong>SA:</strong> Fuel price data provided by <strong>South Australia Government</strong> via fuel pricing scheme.</li>
+        <li><strong>WA:</strong> Data sourced from <strong>WA FuelWatch</strong>, Department of Mines, Industry Regulation and Safety.</li>
+        <li><strong>VIC:</strong> Fuel price data provided by <strong>Service Victoria</strong>, fuel price data may delay up to 24 hrs as required.</li>
+        <li><strong>NT:</strong> Sourced via respective state-mandated real-time reporting schemes.</li>
+    </ul>
+    <p style="margin: 8px 0 0 0; font-style: italic;">Note: The data is provided "as is" without warranty. Users should verify prices at the station.</p>
+</div>
+
+        <div style="margin-top:20px; border-top:1px solid #eee; padding-top:15px; text-align:center;">
+            <p style="font-size:13px; color:#444;">
+                Found a bug or have a suggestion? <br>
+                <a href="https://github.com/DynastyKids/NodeJS-FuelWatchdog/issues" target="_blank" style="color:#1976d2; font-weight:bold;">Submit an Issue on GitHub</a>
+            </p>
+            <button id="about-close-btn" style="background:#1976d2; color:white; border:none; padding:8px 25px; border-radius:20px; cursor:pointer; margin-top:10px;">Close</button>
+        </div>
+    </div>
+</div>
+    </div>
+
+    <nav class="navbar">
+        <div id="menu-toggle" style="cursor:pointer; font-size: 24px;">☰</div>
+        <div>Fuel Price Watchdog</div>
+        <div style="flex-grow: 1; margin: 0 15px; max-width: 350px; position: relative;">
+            <input type="text" id="search-input" placeholder="Search suburb...">
+            <div id="search-error" class="search-error-popup">Not found</div>
+        </div>
+        
+    </nav>
+
+    <div id="map-container">
+        <div id="map-message">🔍 Zoom in to see prices</div>
+        <div id="ui-overlay">
+            <select id="fuel-select"
+                style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd; font-size: 14px; outline: none; cursor: pointer;">
+                <optgroup label="Petrol">
+                    <option value="U91">Unleaded 91</option>
+                    <option value="E10">Unleaded 94 / E10</option>
+                    <option value="P95">Premium 95</option>
+                    <option value="P98">Premium 98</option>
+                    <option value="LAF">Low Aromatic U91 (NT/QLD/SA only)</option>
+                    <option value="E85">Ethanol 85</option>
+                </optgroup>
+                <optgroup label="Diesel">
+                    <option value="DL">Diesel</option>
+                    <option value="PDL">Premium Diesel</option>
+                    <option value="B20">Bio-Diesel</option>
+                </optgroup>
+                <optgroup label="Gas & EV">
+                    <option value="LPG">LPG</option>
+                    <option value="CNG">CNG</option>
+                    <option value="LNG">LNG</option>
+                    <option value="EV">EV Charging</option>
+                </optgroup>
+            </select>
+            <div id="stat-info"></div>
+        </div>
+        <div id="map"></div>
+    </div>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="index.js"></script>
+</body>
+
+</html>
