@@ -3,10 +3,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 1. 全局配置与状态
     const BRAND_MAP = {
-        "7-eleven": "711.png", "ampol": "ampol.png", "bp": "bp.png", "caltex": "caltex.png",
-        "coles": "colesexp.png", "costco": "costco.png", "liberty": "liberty.png",
-        "mobil": "mobil.png", "metro": "metro.png", "shell": "shell.png",
-        "united": "united.png", "puma": "puma.png", "vibe": "vibe.png"
+        "reddy":"shellreddy.png", "reddy express":"shellreddy.png", "coles": "shellreddy.png", "shell": "shell.png",
+        "eg":"egampol.png", "ampol": "ampol.png", "caltex": "caltex.png",
+        "eleven": "711.png","7-eleven": "711.png", "ampm": "ampm.png", "astron":"astron.png", 
+        "bp": "bp.png", "budget":"budget.png", 
+        "costco": "costco.png", "enhance":"enhance.png", 
+        "liberty": "liberty.png", "mobil": "mobil.png", "metro": "metro.png", "matilda": "matilda.png", 
+        "shell": "shell.png", "speedway": "speedway.png",
+        "united": "united.png", "puma": "puma.png", "vibe": "vibe.png", "westside": "westside.png"
     };
 
     const getIconPath = (name) => {
@@ -61,29 +65,29 @@ document.addEventListener('DOMContentLoaded', () => {
                 const priceDisplay = (priceCents / 100).toFixed(2);
                 const [lng, lat] = s.location.coordinates;
 
-                // --- 14天数据处理 ---
+                // --- 14天数据处理 (仅使用历史数组) ---
                 const now = Math.floor(Date.now() / 1000);
                 const fourteenDaysAgo = now - (14 * 24 * 60 * 60);
-                // 筛选14天内的历史记录
+
+                // 只用 history 中的数据；若缺失则用当前价兜底
                 const history14d = (fuel.history || [])
                     .filter(h => h.datetime >= fourteenDaysAgo)
-                    .sort((a, b) => a.datetime - b.datetime); // 时间正序绘图
+                    .sort((a, b) => a.datetime - b.datetime);
 
-                let low14 = priceCents, high14 = priceCents;
+                const dataForStats = history14d.length ? history14d : [{ price: fuel.price, datetime: fuel.datetime }];
+                const hPrices = dataForStats.map(h => h.price);
+                const low14 = Math.min(...hPrices);
+                const high14 = Math.max(...hPrices);
+
+                // --- 生成轻量级 SVG 折线图 ---
                 let sparkline = "";
-
                 if (history14d.length > 0) {
-                    const hPrices = history14d.map(h => h.price);
-                    low14 = Math.min(...hPrices, priceCents);
-                    high14 = Math.max(...hPrices, priceCents);
-
-                    // --- 生成轻量级 SVG 折线图 ---
                     const points = history14d.map((h, i) => {
-                        const x = (i / (history14d.length - 1)) * 180 || 0;
+                        const x = history14d.length === 1 ? 0 : (i / (history14d.length - 1)) * 180;
                         const y = high14 === low14 ? 15 : 30 - ((h.price - low14) / (high14 - low14)) * 30;
                         return `${x},${y}`;
                     }).join(" ");
-                    
+
                     sparkline = `
                         <svg width="100%" height="35" style="margin-top:5px; stroke:#1976d2; stroke-width:2; fill:none;">
                             <polyline points="${points}" stroke-linejoin="round" />
@@ -120,7 +124,10 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <span>14D Low: <b style="color:#4caf50">$${(low14/100).toFixed(2)}</b></span>
                                 <span>14D High: <b style="color:#f44336">$${(high14/100).toFixed(2)}</b></span>
                             </div>
-                            ${sparkline}
+                            <div style="margin-top:5px; border-top:1px dashed #ddd; padding-top:5px;">
+                                <span style="font-size:10px; color:#777; margin-top:5px; border-top:1px dashed #ddd; padding-top:5px;"">Price Trend</span>
+                                ${sparkline}
+                            </div>
                         </div>
 
                         <div style="display: flex; gap: 8px; margin-top:12px;">

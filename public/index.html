@@ -164,13 +164,23 @@
         }
 
         .brand-logo {
-            width: 24px;
-            height: 24px;
+            max-width: 30px !important;
+            max-height: 30px !important;
+            width: auto !important;
+            height: auto !important;
             object-fit: contain;
             background: white;
             border-radius: 4px;
             border: 1px solid #ddd;
             padding: 1px;
+        }
+
+        .leaflet-container .leaflet-marker-pane .brand-logo,
+        .leaflet-container .leaflet-shadow-pane .brand-logo {
+            max-width: 30px !important;
+            max-height: 30px !important;
+            width: auto !important;
+            height: auto !important;
         }
 
         .search-error-popup {

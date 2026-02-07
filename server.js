@@ -43,8 +43,8 @@ app.get('/api/stations', async (req, res) => {
             };
         }
 
+        // 返回完整的燃油历史，供前端计算 14 天内高低价和绘制趋势线
         const stations = await coll_hot.find(query)
-            .project({ "fuels.history": 0 })
             .limit(200)
             .toArray();
 
