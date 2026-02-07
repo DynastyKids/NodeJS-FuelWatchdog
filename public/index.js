@@ -31,12 +31,21 @@ document.addEventListener('DOMContentLoaded', () => {
         return fromBrand || '/icons/gas.png';
     };
 
+    const getStationKey = (station) => {
+        if (!station) return 'station';
+        if (station._id) {
+            return typeof station._id === 'object' ? station._id.toString() : station._id.toString();
+        }
+        const coord = station.location?.coordinates;
+        if (coord && coord.length >= 2) {
+            return `${coord[1]}-${coord[0]}`;
+        }
+        return (station.name || 'station').toString();
+    };
+
     const createSparklineId = (station, fuel) => {
-        const coord = station.location?.coordinates || [0, 0];
-        const base = station._id
-            ? (typeof station._id === 'object' ? station._id.toString() : station._id)
-            : `${coord[1]}-${coord[0]}`;
-        const sanitized = base.toString().replace(/[^a-zA-Z0-9-]/g, '-');
+        const baseKey = getStationKey(station);
+        const sanitized = baseKey.toString().replace(/[^a-zA-Z0-9-]/g, '-');
         const sanitizedFuel = fuel ? fuel.toString().replace(/[^a-zA-Z0-9-]/g, '-') : 'fuel';
         return `sparkline-${sanitized}-${sanitizedFuel}`;
     };
@@ -151,6 +160,70 @@ document.addEventListener('DOMContentLoaded', () => {
     const map = L.map('map', { zoomControl: false }).setView([-33.8688, 151.2093], 13);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
     const markersLayer = L.layerGroup().addTo(map);
+    const stationMarkerMap = new Map();
+
+    const cheapestToggleBtn = document.getElementById('cheapest-toggle-btn');
+    const cheapestPanel = document.getElementById('cheapest-panel');
+    const cheapestList = document.getElementById('cheapest-list');
+    let cheapestExpanded = false;
+
+    const setCheapestPanelState = (open) => {
+        if (!cheapestPanel) return;
+        cheapestExpanded = open;
+        cheapestPanel.classList.toggle('open', open);
+        if (cheapestToggleBtn) {
+            cheapestToggleBtn.textContent = open ? 'Hide' : 'Show';
+        }
+    };
+
+    cheapestToggleBtn?.addEventListener('click', () => setCheapestPanelState(!cheapestExpanded));
+
+    cheapestList?.addEventListener('click', (event) => {
+        const button = event.target.closest('.cheapest-jump');
+        if (!button) return;
+        const key = button.dataset.stationKey;
+        if (!key) return;
+        const marker = stationMarkerMap.get(key);
+        if (marker) {
+            const latLng = marker.getLatLng();
+            map.setView(latLng, 15);
+            marker.openPopup();
+        }
+    });
+
+    setCheapestPanelState(false);
+
+    const updateCheapestList = (stations) => {
+        if (!cheapestList) return;
+        const entries = [];
+        stations.forEach((station) => {
+            const fuel = station.fuels?.find(f => f.fueltype === selectedFuel);
+            if (!fuel) return;
+            const key = getStationKey(station);
+            const name = station.name || (station.address?.address?.[0]) || station.brand || 'Unnamed station';
+            entries.push({
+                key,
+                name,
+                price: fuel.price
+            });
+        });
+
+        const cheapest = entries.sort((a, b) => a.price - b.price).slice(0, 5);
+        if (!cheapest.length) {
+            cheapestList.innerHTML = '<div class="cheapest-empty" style="font-size:12px; color:#666;">No stations available</div>';
+            return;
+        }
+
+        cheapestList.innerHTML = cheapest.map(entry => `
+            <div class="cheapest-item">
+                <div>
+                    <div class="cheapest-station">${entry.name}</div>
+                    <div class="cheapest-price">$${(entry.price / 100).toFixed(2)}</div>
+                </div>
+                <button class="cheapest-jump" data-station-key="${entry.key}" type="button">Jump</button>
+            </div>
+        `).join('');
+    };
 
     let currentStations = [], selectedFuel = 'U91', trendDays = 14;
     let excludedBrands = new Set(), tempExcludedBrands = new Set();
@@ -158,6 +231,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 2. 核心：渲染逻辑
     const renderMarkers = () => {
         markersLayer.clearLayers();
+        stationMarkerMap.clear();
         if (!currentStations.length) return;
 
     const filtered = currentStations.filter(s => {
@@ -173,6 +247,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
         const prices = filtered.map(s => s.fuels.find(f => f.fueltype === selectedFuel).price).sort((a,b) => a-b);
+        updateCheapestList(filtered);
         if (prices.length > 0) {
             const minP = prices[0], maxP = prices[prices.length - 1];
             const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
@@ -227,6 +302,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         <canvas id="${sparklineId}" class="sparkline-canvas" width="260" height="60"></canvas>
                     </div>`;
 
+                const stationKey = getStationKey(s);
+
                 // 颜色逻辑
                 let bg = "#fff", brd = "#ccc", txt = "#333";
                 if (priceCents <= minP * 1.01) { bg = "#4caf50"; brd = "#2e7d32"; txt = "#fff"; }
@@ -277,6 +354,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 `;
 
                 const marker = L.marker([lat, lng], { icon });
+                marker.stationKey = stationKey;
+                stationMarkerMap.set(stationKey, marker);
                 marker.sparklineHistory = sparklineHistory;
                 marker.sparklineChartId = sparklineId;
                 marker.on('popupopen', () => attachSparklineChart(marker));

@@ -194,6 +194,87 @@
             height: 60px;
         }
 
+        .cheapest-section {
+            margin-top: 10px;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            padding: 8px;
+            background: #fdfdfd;
+        }
+
+        .cheapest-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .cheapest-toggle-btn {
+            border: 1px solid #1976d2;
+            background: white;
+            color: #1976d2;
+            border-radius: 6px;
+            padding: 2px 8px;
+            font-size: 11px;
+            cursor: pointer;
+        }
+
+        .cheapest-panel {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.25s ease;
+        }
+
+        .cheapest-panel.open {
+            max-height: 320px;
+        }
+
+        .cheapest-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-height: 280px;
+            overflow-y: auto;
+        }
+
+        .cheapest-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .cheapest-item:last-child {
+            border-bottom: none;
+        }
+
+        .cheapest-item span {
+            font-size: 12px;
+        }
+
+        .cheapest-station {
+            font-weight: 600;
+        }
+
+        .cheapest-price {
+            margin-top: 2px;
+            color: #1976d2;
+        }
+
+        .cheapest-jump {
+            border: none;
+            background: #1976d2;
+            color: white;
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 11px;
+            cursor: pointer;
+            margin-left: 8px;
+        }
+
         .search-error-popup {
             position: absolute;
             top: 45px;
@@ -353,7 +434,16 @@
                     <option value="EV">EV Charging</option>
                 </optgroup>
             </select>
-            <div>Today Price Range:</div>
+            <div>Price Range:</div>
+            <div class="cheapest-section">
+                <div class="cheapest-header">
+                    <span>Cheapest 5 stations:</span>
+                    <button id="cheapest-toggle-btn" class="cheapest-toggle-btn" type="button">Show</button>
+                </div>
+                <div id="cheapest-panel" class="cheapest-panel">
+                    <div id="cheapest-list" class="cheapest-list"></div>
+                </div>
+            </div>
             <div id="stat-info"></div>
             <hr>
             <span>Showing stations price history for:</span>
