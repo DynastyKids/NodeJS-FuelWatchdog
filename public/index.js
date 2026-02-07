@@ -5,28 +5,154 @@ document.addEventListener('DOMContentLoaded', () => {
     const BRAND_MAP = {
         "reddy":"shellreddy.png", "reddy express":"shellreddy.png", "coles": "shellreddy.png", "shell": "shell.png",
         "eg":"egampol.png", "ampol": "ampol.png", "caltex": "caltex.png",
-        "eleven": "711.png","7-eleven": "711.png", "ampm": "ampm.png", "astron":"astron.png", 
+        "apex":"apex.png", "eleven": "711.png","7-eleven": "711.png", "ampm": "ampm.png", "astron":"astron.png", 
         "bp": "bp.png", "budget":"budget.png", 
         "costco": "costco.png", "enhance":"enhance.png", 
-        "liberty": "liberty.png", "mobil": "mobil.png", "metro": "metro.png", "matilda": "matilda.png", 
-        "shell": "shell.png", "speedway": "speedway.png",
-        "united": "united.png", "puma": "puma.png", "vibe": "vibe.png", "westside": "westside.png"
+        "liberty": "liberty.png", "mobil": "mobil.png", "metro": "metro.png", "matilda": "matilda.png", "otr": "otr.png",
+        "puma": "puma.png", "sinopec": "sinopec.png", "speedway": "speedway.png",
+        "u-go":"ugo.png", "united": "united.png", "vibe": "vibe.png", "westside": "westside.png"
     };
 
-    const getIconPath = (name) => {
-        if (!name) return '/icons/gas.png';
-        const low = name.toLowerCase();
+    const findIconMatch = (value) => {
+        if (!value) return null;
+        const low = value.toLowerCase();
         for (const key in BRAND_MAP) {
             if (low.includes(key)) return `/icons/${BRAND_MAP[key]}`;
         }
-        return '/icons/gas.png';
+        return null;
+    };
+
+    const getIconPath = (source) => {
+        if (!source) return '/icons/gas.png';
+        if (typeof source === 'string') return findIconMatch(source) || '/icons/gas.png';
+        const fromName = findIconMatch(source.name);
+        if (fromName) return fromName;
+        const fromBrand = findIconMatch(source.brand);
+        return fromBrand || '/icons/gas.png';
+    };
+
+    const createSparklineId = (station, fuel) => {
+        const coord = station.location?.coordinates || [0, 0];
+        const base = station._id
+            ? (typeof station._id === 'object' ? station._id.toString() : station._id)
+            : `${coord[1]}-${coord[0]}`;
+        const sanitized = base.toString().replace(/[^a-zA-Z0-9-]/g, '-');
+        const sanitizedFuel = fuel ? fuel.toString().replace(/[^a-zA-Z0-9-]/g, '-') : 'fuel';
+        return `sparkline-${sanitized}-${sanitizedFuel}`;
+    };
+
+    const pointAnnotationPlugin = {
+        id: 'pointAnnotationPlugin',
+        afterDatasetsDraw: (chart, args, options) => {
+            const history = options.history || [];
+            if (!history.length) return;
+            const ctx = chart.ctx;
+            ctx.save();
+            ctx.fillStyle = '#1976d2';
+            ctx.strokeStyle = '#1976d2';
+            ctx.lineWidth = 1;
+            ctx.font = '10px "Roboto", sans-serif';
+            ctx.textBaseline = 'bottom';
+
+            const meta = chart.getDatasetMeta(0);
+            meta.data.forEach((element, index) => {
+                const x = element.x;
+                const y = element.y;
+                ctx.beginPath();
+                ctx.arc(x, y, 3, 0, Math.PI * 2);
+                ctx.fill();
+
+                const point = history[index];
+                // if (point) {
+                //     const labelDate = new Date(point.datetime * 1000).toLocaleDateString('en-AU', {
+                //         month: 'short',
+                //         day: 'numeric'
+                //     });
+                //     const labelText = `(${labelDate}, $${point.price.toFixed(2)})`;
+                //     ctx.fillText(labelText, x + 4, y - 4);
+                // }
+            });
+
+            ctx.restore();
+        }
+    };
+
+    const attachSparklineChart = (marker) => {
+        const history = marker.sparklineHistory || [];
+        if (!history.length || !marker.sparklineChartId || typeof Chart === 'undefined') return;
+        const canvas = document.getElementById(marker.sparklineChartId);
+        if (!canvas) return;
+        if (marker.sparklineChart) {
+            marker.sparklineChart.destroy();
+        }
+
+        const ctx = canvas.getContext('2d');
+        const values = history.map(point => point.price);
+        const minPrice = Math.min(...values);
+        const maxPrice = Math.max(...values);
+        const valueRange = Math.max(maxPrice - minPrice, 0.1);
+        const yMin = minPrice - valueRange * 0.1;
+        const yMax = maxPrice + valueRange * 0.1;
+
+        marker.sparklineChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: history.map((_, idx) => idx),
+                datasets: [{
+                    data: values,
+                    borderColor: '#1976d2',
+                    backgroundColor: 'rgba(25, 118, 210, 0.25)',
+                    borderWidth: 2,
+                    pointRadius: 3,
+                    tension: 0.35,
+                    fill: 'start'
+                }]
+            },
+            options: {
+                responsive: false,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { display: false },
+                    y: {
+                        display: false,
+                        min: yMin,
+                        max: yMax
+                    }
+                },
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        callbacks: {
+                            label: (ctx) => `$${ctx.parsed.y.toFixed(2)}`,
+                            title: (ctxArr) => {
+                                const idx = ctxArr?.[0]?.dataIndex ?? 0;
+                                const point = history[idx];
+                                if (!point) return '';
+                                return new Date(point.datetime * 1000).toLocaleDateString('en-AU', {
+                                    month: 'short',
+                                    day: 'numeric'
+                                });
+                            }
+                        }
+                    },
+                    pointAnnotationPlugin: { history }
+                }
+            },
+            plugins: [pointAnnotationPlugin]
+        });
     };
 
     const map = L.map('map', { zoomControl: false }).setView([-33.8688, 151.2093], 13);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
     const markersLayer = L.layerGroup().addTo(map);
 
-    let currentStations = [], selectedFuel = 'U91';
+    let currentStations = [], selectedFuel = 'U91', trendDays = 14;
     let excludedBrands = new Set(), tempExcludedBrands = new Set();
 
     // 2. 核心：渲染逻辑
@@ -65,13 +191,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 const priceDisplay = (priceCents / 100).toFixed(2);
                 const [lng, lat] = s.location.coordinates;
 
-                // --- 14天数据处理 (仅使用历史数组) ---
+                // --- N天数据处理 (仅使用历史数组) ---
                 const now = Math.floor(Date.now() / 1000);
-                const fourteenDaysAgo = now - (14 * 24 * 60 * 60);
+                const rangeSeconds = trendDays * 24 * 60 * 60;
+                const rangeAgo = now - rangeSeconds;
 
                 // 只用 history 中的数据；若缺失则用当前价兜底
                 const history14d = (fuel.history || [])
-                    .filter(h => h.datetime >= fourteenDaysAgo)
+                    .filter(h => h.datetime >= rangeAgo)
                     .sort((a, b) => a.datetime - b.datetime);
 
                 const dataForStats = history14d.length ? history14d : [{ price: fuel.price, datetime: fuel.datetime }];
@@ -79,20 +206,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 const low14 = Math.min(...hPrices);
                 const high14 = Math.max(...hPrices);
 
-                // --- 生成轻量级 SVG 折线图 ---
-                let sparkline = "";
-                if (history14d.length > 0) {
-                    const points = history14d.map((h, i) => {
-                        const x = history14d.length === 1 ? 0 : (i / (history14d.length - 1)) * 180;
-                        const y = high14 === low14 ? 15 : 30 - ((h.price - low14) / (high14 - low14)) * 30;
-                        return `${x},${y}`;
-                    }).join(" ");
+                const currentTimestamp = fuel.datetime || Math.floor(Date.now() / 1000);
+                const currentPoint = {
+                    datetime: currentTimestamp,
+                    price: (fuel.price / 100)
+                };
 
-                    sparkline = `
-                        <svg width="100%" height="35" style="margin-top:5px; stroke:#1976d2; stroke-width:2; fill:none;">
-                            <polyline points="${points}" stroke-linejoin="round" />
-                        </svg>`;
+                const sparklineHistory = dataForStats.map(h => ({
+                    datetime: h.datetime,
+                    price: h.price / 100
+                }));
+
+                const lastPoint = sparklineHistory[sparklineHistory.length - 1];
+                if (!lastPoint || lastPoint.datetime !== currentPoint.datetime || lastPoint.price !== currentPoint.price) {
+                    sparklineHistory.push(currentPoint);
                 }
+                const sparklineId = createSparklineId(s, selectedFuel);
+                const sparklineMarkup = `
+                    <div class="sparkline-wrapper">
+                        <canvas id="${sparklineId}" class="sparkline-canvas" width="260" height="60"></canvas>
+                    </div>`;
 
                 // 颜色逻辑
                 let bg = "#fff", brd = "#ccc", txt = "#333";
@@ -103,7 +236,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     className: 'custom-marker',
                     html: `<div class="marker-container">
                         <div class="price-bubble" style="background:${bg}; border-color:${brd}; color:${txt}">$${priceDisplay}</div>
-                        <img src="${getIconPath(s.brand)}" class="brand-logo">
+                        <img src="${getIconPath(s)}" class="brand-logo">
                     </div>`,
                     iconSize: [40, 50], iconAnchor: [20, 45]
                 });
@@ -112,7 +245,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const suburb = (s.address && s.address.suburb) ? s.address.suburb : "";
 
                 const popupContent = `
-                    <div style="min-width:200px; padding:2px">
+                    <div style="width:300px; min-width:300px; max-width:320px; padding:2px; box-sizing:border-box;">
                         <b style="font-size:14px;">${s.name}</b>
                         <div style="font-size:11px; color:#666; margin-bottom:8px;">${street}, ${suburb}</div>
                         
@@ -121,12 +254,12 @@ document.addEventListener('DOMContentLoaded', () => {
                                 $${priceDisplay}
                             </div>
                             <div style="display:flex; justify-content:space-between; font-size:10px; color:#777; margin-top:5px; border-top:1px dashed #ddd; padding-top:5px;">
-                                <span>14D Low: <b style="color:#4caf50">$${(low14/100).toFixed(2)}</b></span>
-                                <span>14D High: <b style="color:#f44336">$${(high14/100).toFixed(2)}</b></span>
+                                <span>${trendDays}D Low: <b style="color:#4caf50">$${(low14/100).toFixed(2)}</b></span>
+                                <span>${trendDays}D High: <b style="color:#f44336">$${(high14/100).toFixed(2)}</b></span>
                             </div>
                             <div style="margin-top:5px; border-top:1px dashed #ddd; padding-top:5px;">
-                                <span style="font-size:10px; color:#777; margin-top:5px; border-top:1px dashed #ddd; padding-top:5px;"">Price Trend</span>
-                                ${sparkline}
+                                <span style="font-size:10px; color:#777;">Price Trend</span>
+                                ${sparklineMarkup}
                             </div>
                         </div>
 
@@ -143,7 +276,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 `;
 
-                L.marker([lat, lng], {icon}).bindPopup(popupContent).addTo(markersLayer);
+                const marker = L.marker([lat, lng], { icon });
+                marker.sparklineHistory = sparklineHistory;
+                marker.sparklineChartId = sparklineId;
+                marker.on('popupopen', () => attachSparklineChart(marker));
+                marker.on('popupclose', () => marker.sparklineChart?.destroy());
+                marker.bindPopup(popupContent).addTo(markersLayer);
             });
         }
     };
@@ -258,6 +396,12 @@ document.getElementById('apply-filters').onclick = () => {
 
     document.getElementById('fuel-select').onchange = (e) => {
         selectedFuel = e.target.value;
+        renderMarkers();
+    };
+
+    // 趋势时间范围选择（14/28，其他选项已注释备用）
+    document.getElementById('trend-range-select').onchange = (e) => {
+        trendDays = parseInt(e.target.value, 10) || 14;
         renderMarkers();
     };
 

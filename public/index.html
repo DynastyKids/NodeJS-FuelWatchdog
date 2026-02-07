@@ -115,7 +115,7 @@
             padding: 15px;
             border-radius: 12px;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-            width: 210px;
+            width: 280px;
         }
 
         #map-message {
@@ -181,6 +181,17 @@
             max-height: 30px !important;
             width: auto !important;
             height: auto !important;
+        }
+
+        .sparkline-wrapper {
+            width: 100%;
+            height: 60px;
+            margin-top: 8px;
+        }
+
+        .sparkline-canvas {
+            width: 100%;
+            height: 60px;
         }
 
         .search-error-popup {
@@ -319,6 +330,7 @@
     <div id="map-container">
         <div id="map-message">🔍 Zoom in to see prices</div>
         <div id="ui-overlay">
+            <span>Fuel Type:</span>
             <select id="fuel-select"
                 style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd; font-size: 14px; outline: none; cursor: pointer;">
                 <optgroup label="Petrol">
@@ -341,11 +353,21 @@
                     <option value="EV">EV Charging</option>
                 </optgroup>
             </select>
+            <div>Today Price Range:</div>
             <div id="stat-info"></div>
+            <hr>
+            <span>Showing stations price history for:</span>
+            <select id="trend-range-select" style="width: 100%; margin-top: 8px; padding: 8px; border-radius: 8px; border: 1px solid #ddd; font-size: 13px; outline: none; cursor: pointer;">
+                <option value="14">Last 14 days</option>
+                <!-- <option value="28">Last 28 days</option> -->
+                <!-- <option value="60">Last 60 days</option> -->
+                <!-- <option value="90">Last 90 days</option> -->
+            </select>
         </div>
         <div id="map"></div>
     </div>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.min.js"></script>
     <script src="index.js"></script>
 </body>
 
