@@ -52,7 +52,7 @@
 * Node.js (OpenJS Foundation)
 * Leaflet (BSD-2-Clause)
 * MongoDB (SSPL/Apache)
-* 地图数据 © OpenStreetMap 贡献者
+* 地图数据 © OpenStreetMap
 
 ---
 
