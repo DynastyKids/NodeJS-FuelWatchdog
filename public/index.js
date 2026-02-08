@@ -31,6 +31,53 @@ document.addEventListener('DOMContentLoaded', () => {
         return fromBrand || '/icons/gas.png';
     };
 
+    const toNumberOrZero = (value) => {
+        const num = typeof value === 'number' ? value : parseFloat(value);
+        return Number.isFinite(num) ? num : 0;
+    };
+
+    const formatDollarDisplay = (value) => {
+        const formatted = value.toFixed(4);
+        if (!formatted.includes('.')) return formatted;
+        return formatted
+            .replace(/(\.\d*?)0+$/, '$1')
+            .replace(/\.$/, '');
+    };
+
+    const normalizeFuelPrice = (value) => {
+        const raw = toNumberOrZero(value);
+        const cents = raw / 100;
+        const dollars = cents / 100;
+        return {
+            raw,
+            cents,
+            dollars,
+            centsLabel: `${cents.toFixed(2)} ¢`,
+            dollarsLabel: `$${formatDollarDisplay(dollars)}`
+        };
+    };
+
+    let showCentFormat = true;
+    const priceFormatToggle = document.getElementById('price-format-toggle');
+    const priceFormatLabel = document.getElementById('price-format-label');
+
+    const updatePriceFormatLabel = () => {
+        if (!priceFormatLabel) return;
+        priceFormatLabel.textContent = showCentFormat ? 'Cent format' : 'Dollar format';
+    };
+
+    const getPrimaryPriceLabel = (priceStats) => showCentFormat ? priceStats.centsLabel : priceStats.dollarsLabel;
+
+    if (priceFormatToggle) {
+        showCentFormat = priceFormatToggle.checked ?? true;
+        priceFormatToggle.addEventListener('change', (event) => {
+            showCentFormat = event.target.checked;
+            updatePriceFormatLabel();
+            renderMarkers();
+        });
+    }
+    updatePriceFormatLabel();
+
     const getStationKey = (station) => {
         if (!station) return 'station';
         if (station._id) {
@@ -138,7 +185,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         mode: 'index',
                         intersect: false,
                         callbacks: {
-                            label: (ctx) => `$${ctx.parsed.y.toFixed(2)}`,
+                            label: (ctx) => showCentFormat
+                                ? `${(ctx.parsed.y * 100).toFixed(2)} ¢`
+                                : `$${ctx.parsed.y.toFixed(4)}`,
                             title: (ctxArr) => {
                                 const idx = ctxArr?.[0]?.dataIndex ?? 0;
                                 const point = history[idx];
@@ -204,25 +253,31 @@ document.addEventListener('DOMContentLoaded', () => {
             entries.push({
                 key,
                 name,
-                price: fuel.price
+                priceRaw: fuel.price,
+                priceStats: normalizeFuelPrice(fuel.price)
             });
         });
 
-        const cheapest = entries.sort((a, b) => a.price - b.price).slice(0, 5);
+        const cheapest = entries.sort((a, b) => a.priceRaw - b.priceRaw).slice(0, 5);
         if (!cheapest.length) {
             cheapestList.innerHTML = '<div class="cheapest-empty" style="font-size:12px; color:#666;">No stations available</div>';
             return;
         }
 
-        cheapestList.innerHTML = cheapest.map(entry => `
-            <div class="cheapest-item">
-                <div>
-                    <div class="cheapest-station">${entry.name}</div>
-                    <div class="cheapest-price">$${(entry.price / 100).toFixed(2)}</div>
+        cheapestList.innerHTML = cheapest.map(entry => {
+            const primary = getPrimaryPriceLabel(entry.priceStats);
+            return `
+                <div class="cheapest-item">
+                    <div>
+                        <div class="cheapest-station">${entry.name}</div>
+                        <div class="cheapest-price">
+                            ${primary}
+                        </div>
+                    </div>
+                    <button class="cheapest-jump" data-station-key="${entry.key}" type="button">Jump</button>
                 </div>
-                <button class="cheapest-jump" data-station-key="${entry.key}" type="button">Jump</button>
-            </div>
-        `).join('');
+            `;
+        }).join('');
     };
 
     let currentStations = [], selectedFuel = 'U91', trendDays = 14;
@@ -238,7 +293,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const fuel = s.fuels.find(f => f.fueltype === selectedFuel);
         if (!fuel || excludedBrands.has(s.brand)) return false;
 
-        const priceInDollars = fuel.price / 100;
+        const { dollars: priceInDollars } = normalizeFuelPrice(fuel.price);
         // 价格区间过滤
         if (priceFilter.min !== null && priceInDollars < priceFilter.min) return false;
         if (priceFilter.max !== null && priceInDollars > priceFilter.max) return false;
@@ -253,17 +308,27 @@ document.addEventListener('DOMContentLoaded', () => {
             const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
             const median = prices[Math.floor(prices.length / 2)];
 
+            const minPriceInfo = normalizeFuelPrice(minP);
+            const maxPriceInfo = normalizeFuelPrice(maxP);
+            const avgPriceInfo = normalizeFuelPrice(avg);
+
             document.getElementById('stat-info').innerHTML = `
                 <div style="font-size:11px; border-top:1px solid #eee; padding-top:8px; display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
-                    <div style="color:#4caf50"><b>Min:</b> $${(minP/100).toFixed(2)}</div>
-                    <div style="color:#f44336; text-align:right;"><b>Max:</b> $${(maxP/100).toFixed(2)}</div>
-                    <div style="grid-column: span 2; color:#1976d2; margin-top:4px;"><b>Average:</b> $${(avg/100).toFixed(2)}</div>
+                    <div style="color:#4caf50">
+                        <b>Min:</b> ${getPrimaryPriceLabel(minPriceInfo)}
+                    </div>
+                    <div style="color:#f44336; text-align:right;">
+                        <b>Max:</b> ${getPrimaryPriceLabel(maxPriceInfo)}
+                    </div>
+                    <div style="grid-column: span 2; color:#1976d2; margin-top:4px;">
+                        <b>Average:</b> ${getPrimaryPriceLabel(avgPriceInfo)}
+                    </div>
                 </div>`;
 
             filtered.forEach(s => {
                 const fuel = s.fuels.find(f => f.fueltype === selectedFuel);
-                const priceCents = fuel.price;
-                const priceDisplay = (priceCents / 100).toFixed(2);
+                const priceRaw = fuel.price;
+                const priceStats = normalizeFuelPrice(priceRaw);
                 const [lng, lat] = s.location.coordinates;
 
                 // --- N天数据处理 (仅使用历史数组) ---
@@ -280,16 +345,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 const hPrices = dataForStats.map(h => h.price);
                 const low14 = Math.min(...hPrices);
                 const high14 = Math.max(...hPrices);
+                const low14Info = normalizeFuelPrice(low14);
+                const high14Info = normalizeFuelPrice(high14);
 
                 const currentTimestamp = fuel.datetime || Math.floor(Date.now() / 1000);
                 const currentPoint = {
                     datetime: currentTimestamp,
-                    price: (fuel.price / 100)
+                    price: priceStats.dollars
                 };
 
                 const sparklineHistory = dataForStats.map(h => ({
                     datetime: h.datetime,
-                    price: h.price / 100
+                    price: normalizeFuelPrice(h.price).dollars
                 }));
 
                 const lastPoint = sparklineHistory[sparklineHistory.length - 1];
@@ -306,13 +373,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // 颜色逻辑
                 let bg = "#fff", brd = "#ccc", txt = "#333";
-                if (priceCents <= minP * 1.01) { bg = "#4caf50"; brd = "#2e7d32"; txt = "#fff"; }
-                else if (priceCents >= median * 1.03 || priceCents === maxP) { bg = "#fff1f0"; brd = "#f44336"; txt = "#cf1322"; }
+                if (priceRaw <= minP * 1.01) { bg = "#4caf50"; brd = "#2e7d32"; txt = "#fff"; }
+                else if (priceRaw >= median * 1.03 || priceRaw === maxP) { bg = "#fff1f0"; brd = "#f44336"; txt = "#cf1322"; }
 
                 const icon = L.divIcon({
                     className: 'custom-marker',
                     html: `<div class="marker-container">
-                        <div class="price-bubble" style="background:${bg}; border-color:${brd}; color:${txt}">$${priceDisplay}</div>
+                        <div class="price-bubble" style="background:${bg}; border-color:${brd}; color:${txt}">
+                            ${getPrimaryPriceLabel(priceStats)}
+                        </div>
                         <img src="${getIconPath(s)}" class="brand-logo">
                     </div>`,
                     iconSize: [40, 50], iconAnchor: [20, 45]
@@ -327,12 +396,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div style="font-size:11px; color:#666; margin-bottom:8px;">${street}, ${suburb}</div>
                         
                         <div style="background:#f8f9fa; padding:10px; border-radius:6px; position:relative;">
-                            <div style="font-size:22px; font-weight:900; color:${priceCents === minP ? '#4caf50' : (priceCents === maxP ? '#f44336' : '#1976d2')}">
-                                $${priceDisplay}
+                            <div style="font-size:22px; font-weight:900; color:${priceRaw === minP ? '#4caf50' : (priceRaw === maxP ? '#f44336' : '#1976d2')}">
+                                ${getPrimaryPriceLabel(priceStats)}
                             </div>
                             <div style="display:flex; justify-content:space-between; font-size:10px; color:#777; margin-top:5px; border-top:1px dashed #ddd; padding-top:5px;">
-                                <span>${trendDays}D Low: <b style="color:#4caf50">$${(low14/100).toFixed(2)}</b></span>
-                                <span>${trendDays}D High: <b style="color:#f44336">$${(high14/100).toFixed(2)}</b></span>
+                                <span>${trendDays}D Low: <b style="color:#4caf50">${getPrimaryPriceLabel(low14Info)}</b></span>
+                                <span>${trendDays}D High: <b style="color:#f44336">${getPrimaryPriceLabel(high14Info)}</b></span>
                             </div>
                             <div style="margin-top:5px; border-top:1px dashed #ddd; padding-top:5px;">
                                 <span style="font-size:10px; color:#777;">Price Trend</span>
