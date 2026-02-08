@@ -59,11 +59,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let showCentFormat = true;
     const priceFormatToggle = document.getElementById('price-format-toggle');
-    const priceFormatLabel = document.getElementById('price-format-label');
+    const dollarIndicator = document.querySelector('.unit-indicator[data-side="dollar"]');
+    const centIndicator = document.querySelector('.unit-indicator[data-side="cent"]');
 
-    const updatePriceFormatLabel = () => {
-        if (!priceFormatLabel) return;
-        priceFormatLabel.textContent = showCentFormat ? 'Cent format' : 'Dollar format';
+    const updateIndicatorState = () => {
+        if (dollarIndicator && centIndicator) {
+            dollarIndicator.classList.toggle('active', !showCentFormat);
+            centIndicator.classList.toggle('active', showCentFormat);
+        }
     };
 
     const getPrimaryPriceLabel = (priceStats) => showCentFormat ? priceStats.centsLabel : priceStats.dollarsLabel;
@@ -72,11 +75,11 @@ document.addEventListener('DOMContentLoaded', () => {
         showCentFormat = priceFormatToggle.checked ?? true;
         priceFormatToggle.addEventListener('change', (event) => {
             showCentFormat = event.target.checked;
-            updatePriceFormatLabel();
+            updateIndicatorState();
             renderMarkers();
         });
     }
-    updatePriceFormatLabel();
+    updateIndicatorState();
 
     const getStationKey = (station) => {
         if (!station) return 'station';
