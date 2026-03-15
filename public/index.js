@@ -59,11 +59,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let showCentFormat = true;
     const priceFormatToggle = document.getElementById('price-format-toggle');
-    const priceFormatLabel = document.getElementById('price-format-label');
+    const dollarIndicator = document.querySelector('.unit-indicator[data-side="dollar"]');
+    const centIndicator = document.querySelector('.unit-indicator[data-side="cent"]');
 
-    const updatePriceFormatLabel = () => {
-        if (!priceFormatLabel) return;
-        priceFormatLabel.textContent = showCentFormat ? 'Cent format' : 'Dollar format';
+    const updateIndicatorState = () => {
+        if (dollarIndicator && centIndicator) {
+            dollarIndicator.classList.toggle('active', !showCentFormat);
+            centIndicator.classList.toggle('active', showCentFormat);
+        }
     };
 
     const getPrimaryPriceLabel = (priceStats) => showCentFormat ? priceStats.centsLabel : priceStats.dollarsLabel;
@@ -72,11 +75,11 @@ document.addEventListener('DOMContentLoaded', () => {
         showCentFormat = priceFormatToggle.checked ?? true;
         priceFormatToggle.addEventListener('change', (event) => {
             showCentFormat = event.target.checked;
-            updatePriceFormatLabel();
+            updateIndicatorState();
             renderMarkers();
         });
     }
-    updatePriceFormatLabel();
+    updateIndicatorState();
 
     const getStationKey = (station) => {
         if (!station) return 'station';
@@ -298,6 +301,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (priceFilter.min !== null && priceInDollars < priceFilter.min) return false;
         if (priceFilter.max !== null && priceInDollars > priceFilter.max) return false;
 
+        // 检查油价更新时间：如果超过14天未更新，则不显示
+        const now = Math.floor(Date.now() / 1000);
+        const fourteenDaysAgo = now - (14 * 86400);
+        if (fuel.datetime && fuel.datetime < fourteenDaysAgo) return false;
+
         return true;
     });
 
@@ -331,9 +339,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 const priceStats = normalizeFuelPrice(priceRaw);
                 const [lng, lat] = s.location.coordinates;
 
-                // --- N天数据处理 (仅使用历史数组) ---
+                // 检查是否超过7天未更新价格
                 const now = Math.floor(Date.now() / 1000);
-                const rangeSeconds = trendDays * 24 * 60 * 60;
+                const sevenDaysAgo = now - (7 * 86400);
+                const isOutdated = fuel.datetime && fuel.datetime < sevenDaysAgo;
+
+                // --- N天数据处理 (仅使用历史数组) ---
+                const rangeSeconds = trendDays * 86400;
                 const rangeAgo = now - rangeSeconds;
 
                 // 只用 history 中的数据；若缺失则用当前价兜底
@@ -392,7 +404,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const popupContent = `
                     <div style="width:300px; min-width:300px; max-width:320px; padding:2px; box-sizing:border-box;">
-                        <b style="font-size:14px;">${s.name}</b>
+                        <b style="font-size:14px;">${s.name}${isOutdated ? ' (Price is Outdated)' : ''}</b>
                         <div style="font-size:11px; color:#666; margin-bottom:8px;">${street}, ${suburb}</div>
                         
                         <div style="background:#f8f9fa; padding:10px; border-radius:6px; position:relative;">

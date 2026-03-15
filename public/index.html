@@ -284,11 +284,34 @@
 
         .price-format-switch {
             display: flex;
+            flex-direction: column;
+            gap: 4px;
+            font-size: 12px;
+            color: white;
+        }
+
+        .price-format-switch .switch-title {
+            font-weight: 600;
+            font-size: 12px;
+            color: white;
+            letter-spacing: 0.02em;
+        }
+
+        .price-format-switch .switch-unit-row {
+            display: flex;
             align-items: center;
             gap: 6px;
+        }
+
+        .price-format-switch .unit-indicator {
             font-size: 12px;
-            color: #333;
-            white-space: nowrap;
+            opacity: 0.65;
+            transition: opacity 0.15s;
+        }
+
+        .price-format-switch .unit-indicator.active {
+            opacity: 1;
+            font-weight: 700;
         }
 
         .price-format-switch .switch {
@@ -310,7 +333,7 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background-color: #ccc;
+            background-color: #bdbdbd;
             border-radius: 999px;
             transition: 0.2s;
         }
@@ -328,15 +351,11 @@
         }
 
         .price-format-switch input:checked + .slider {
-            background-color: #1976d2;
+            background-color: #4caf50;
         }
 
         .price-format-switch input:checked + .slider:before {
             transform: translateX(18px);
-        }
-
-        .price-format-switch .switch-label {
-            min-width: 60px;
         }
 
         .search-error-popup {
@@ -468,11 +487,15 @@
         <div class="search-wrapper" style="flex-grow: 1; margin: 0 15px; max-width: 350px; position: relative;">
             <input type="text" id="search-input" placeholder="Search suburb...">
             <div class="price-format-switch">
-                <label class="switch">
-                    <input type="checkbox" id="price-format-toggle" checked>
-                    <span class="slider"></span>
-                </label>
-                <span id="price-format-label" class="switch-label">Cent format</span>
+                <span class="switch-title">Price Unit</span>
+                <div class="switch-unit-row">
+                    <span class="unit-indicator" data-side="dollar">$</span>
+                    <label class="switch">
+                        <input type="checkbox" id="price-format-toggle" checked>
+                        <span class="slider"></span>
+                    </label>
+                    <span class="unit-indicator" data-side="cent">¢</span>
+                </div>
             </div>
             <div id="search-error" class="search-error-popup">Not found</div>
         </div>
