@@ -209,8 +209,37 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
+    const mapConfig = window.FUEL_WATCHDOG_MAP_CONFIG || {};
+    const createBaseTileLayer = () => {
+        if (mapConfig.provider === 'mapbox') {
+            const { accessToken, styleId = 'mapbox/streets-v12' } = mapConfig.mapbox || {};
+            if (!accessToken) {
+                throw new Error('Mapbox requires FUEL_WATCHDOG_MAP_CONFIG.mapbox.accessToken.');
+            }
+
+            return L.tileLayer(
+                `https://api.mapbox.com/styles/v1/${styleId}/tiles/{z}/{x}/{y}?access_token=${encodeURIComponent(accessToken)}`,
+                {
+                    attribution: '© <a href="https://www.mapbox.com/">Mapbox</a> | © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>',
+                    tileSize: 512,
+                    zoomOffset: -1,
+                    maxZoom: 22
+                }
+            );
+        }
+
+        if (mapConfig.provider && mapConfig.provider !== 'openstreetmap') {
+            throw new Error(`Unsupported map tile provider: ${mapConfig.provider}`);
+        }
+
+        return L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>',
+            maxZoom: 19
+        });
+    };
+
     const map = L.map('map', { zoomControl: false }).setView([-33.8688, 151.2093], 13);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
+    createBaseTileLayer().addTo(map);
     const markersLayer = L.layerGroup().addTo(map);
     const stationMarkerMap = new Map();
 

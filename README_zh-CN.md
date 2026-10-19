@@ -10,9 +10,14 @@
 
 ---
 
+## 📝 最近更新
+
+* 地图瓦片由 Carto 切换为 OpenStreetMap，默认无需 API Key 即可加载底图。
+* 增加可选的 Mapbox 瓦片接入配置，详情请参阅[地图瓦片提供方](#地图瓦片提供方)。
+
 ## ✨ 核心功能
 
-* **交互式地图**: 实时加载视野范围内的油站，支持自动聚合与缩放渲染。
+* **交互式地图**: 使用 Leaflet 和 OpenStreetMap 瓦片实时加载视野范围内的油站，默认无需 API Key。
 * **智能价格标注**: 
     * 🟩 **绿色**: 当前视野内的最低价站点。
     * 🟥 **红色**: 显著高于市场中位数的“高价站”。
@@ -25,6 +30,25 @@
 * **前端**: 原生 JavaScript, Leaflet.js, CSS3
 * **后端**: Node.js, Express.js
 * **数据库**: MongoDB (利用 `2dsphere` 空间索引实现地理位置查询)
+
+### 地图瓦片提供方
+
+默认使用无需 API Key 的 OpenStreetMap。如需切换到 Mapbox，请在加载 `index.js` 前配置 `window.FUEL_WATCHDOG_MAP_CONFIG`：
+
+```html
+<script>
+  window.FUEL_WATCHDOG_MAP_CONFIG = {
+    provider: 'mapbox',
+    mapbox: {
+      accessToken: 'YOUR_MAPBOX_PUBLIC_TOKEN',
+      styleId: 'mapbox/streets-v12'
+    }
+  };
+</script>
+<script src="index.js"></script>
+```
+
+Mapbox 访问令牌会暴露给浏览器，请使用限制了可访问域名的公开令牌。地图会保留瓦片提供方要求的版权署名。
 
 ## 📊 数据来源说明
 

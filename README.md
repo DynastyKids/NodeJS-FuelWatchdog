@@ -10,9 +10,14 @@ An open-source, full-stack fuel price monitoring system built with **Node.js** a
 
 ---
 
+## 📝 Recent Updates
+
+* Replaced Carto map tiles with OpenStreetMap tiles, so the map works by default without an API key.
+* Added optional Mapbox tile support through `FUEL_WATCHDOG_MAP_CONFIG`; see [Map tile provider](#map-tile-provider) for setup.
+
 ## ✨ Features
 
-* **Interactive Map**: Real-time station loading based on map bounds using Leaflet.
+* **Interactive Map**: Real-time station loading based on map bounds using Leaflet and OpenStreetMap tiles (no API key required).
 * **Smart Price Highlighting**: 
     * 🟩 **Green**: Best deals in the current view.
     * 🟥 **Red**: Prices significantly higher than the market median.
@@ -25,6 +30,25 @@ An open-source, full-stack fuel price monitoring system built with **Node.js** a
 * **Frontend**: Vanilla JS, Leaflet.js, CSS3
 * **Backend**: Node.js, Express.js
 * **Database**: MongoDB (with `2dsphere` index)
+
+### Map tile provider
+
+OpenStreetMap is used by default and does not require an API key. To use Mapbox instead, define `window.FUEL_WATCHDOG_MAP_CONFIG` before loading `index.js`:
+
+```html
+<script>
+  window.FUEL_WATCHDOG_MAP_CONFIG = {
+    provider: 'mapbox',
+    mapbox: {
+      accessToken: 'YOUR_MAPBOX_PUBLIC_TOKEN',
+      styleId: 'mapbox/streets-v12'
+    }
+  };
+</script>
+<script src="index.js"></script>
+```
+
+Mapbox access tokens are visible to browsers; use a public token restricted to your domain. Map tiles retain their required provider attribution.
 
 ## 📊 Data Attribution & Sources
 
